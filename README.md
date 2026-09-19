@@ -1,68 +1,47 @@
-# Consulta de Seguridad Municipal — app web (Fase 3)
+# Consulta de Seguridad Municipal — Fase 3
 
-Prototipo desplegable de la Fase 3 del proyecto. Responde, para un municipio concreto: cómo se
-compara su inversión en seguridad con su nivel de hurto, a qué otros municipios se parece, y si el
-hurto tiende a empeorar el próximo año.
+Aplicación web desarrollada para la Fase 3 del proyecto. Permite consultar un municipio y revisar su inversión en seguridad, sus niveles de hurto, municipios con características similares y la estimación del comportamiento del hurto para el siguiente año.
 
-## Cómo probarla en tu computador
+## Estructura del proyecto
 
-```bash
-pip install -r app/requirements.txt
-cd app
-streamlit run app.py
-```
+| Archivo                                  | Descripción                                                                                                                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app.py`                                 | Contiene la interfaz de la aplicación, el selector de municipio, los indicadores, las gráficas, la predicción y las recomendaciones.                                      |
+| `modelo.py`                              | Contiene el procesamiento de datos y el modelo utilizado para generar las predicciones. Mantiene las variables y el corte temporal utilizados en la Parte 4 del notebook. |
+| `datos/dataset_municipio_anio_final.csv` | Dataset final organizado por municipio y año.                                                                                                                             |
+| `datos/municipios.csv`                   | Contiene los códigos DIVIPOLA junto con el nombre del municipio y departamento.                                                                                           |
 
-Abre `http://localhost:8501`. La primera carga tarda unos segundos porque entrena el modelo.
+El modelo se vuelve a entrenar cada vez que se inicia la aplicación. Se tomó esta decisión debido a que el entrenamiento del Random Forest con 5.565 registros tarda menos de dos segundos y permite evitar problemas de compatibilidad entre versiones de `scikit-learn` al utilizar archivos serializados.
 
-## Cómo desplegarla en Streamlit Community Cloud
-
-1. Sube el proyecto a un repositorio de GitHub. **Importante:** `data/raw/` pesa 293 MB y un
-   archivo supera el límite de 100 MB de GitHub — añade `data/` al `.gitignore`. La carpeta
-   `app/datos/` (2,3 MB) **sí** debe subirse, porque es lo que la app consume.
-2. Entra a [share.streamlit.io](https://share.streamlit.io) e inicia sesión con GitHub.
-3. **New app** → selecciona el repositorio y la rama.
-4. En *Main file path* escribe `app/app.py`.
-5. **Deploy**. El primer despliegue tarda 2-3 minutos instalando dependencias.
-
-La alternativa es Hugging Face Spaces: crear un Space de tipo *Streamlit*, subir el contenido de
-`app/` en la raíz del Space y renombrar `app.py` si la plataforma lo pide.
-
-## Estructura
-
-| Archivo | Qué hace |
-|---|---|
-| `app.py` | Interfaz: selector de municipio, indicadores, gráfica, previsión, explicación y acciones recomendadas |
-| `modelo.py` | Pipeline de datos y modelo. Replica la Parte 4 del cuaderno: mismas features, mismo corte temporal, mismos cortes de clase |
-| `datos/dataset_municipio_anio_final.csv` | Panel municipio-año que genera el cuaderno |
-| `datos/municipios.csv` | Códigos DIVIPOLA con nombre de municipio y departamento |
-
-El modelo **se reentrena al arrancar** en vez de cargarse desde un `pickle`. Entrenar un Random
-Forest sobre 5.565 filas tarda menos de dos segundos, y así la app no se rompe si la versión de
-scikit-learn del servidor no coincide con la que generó el archivo serializado.
-
-Para regenerar los datos tras un cambio en el cuaderno:
+En caso de modificar el procesamiento realizado en el notebook, los datos utilizados por la aplicación se pueden actualizar mediante:
 
 ```bash
 cp data/processed/dataset_municipio_anio_final.csv app/datos/
 ```
 
-## Decisiones de diseño
+## Decisiones de la aplicación
 
-La app está hecha para un funcionario, no para un científico de datos. Tres decisiones se
-desprenden directamente de los hallazgos del análisis:
+La aplicación está orientada principalmente a facilitar la consulta de los resultados por parte de funcionarios o personas que no necesariamente trabajan directamente con modelos de datos.
 
-**Muestra la cobertura de datos antes que cualquier cifra.** 485 de 1.110 municipios no tienen
-ningún contrato registrado en SECOP. En el análisis, el 93% de la lista de municipios
-"prioritarios" resultó ser municipios de los que no se sabe cuánto gastan, no municipios que
-gastan poco. Por eso la app nunca muestra "inversión: $0" — muestra "sin dato" y explica la
-diferencia, y las acciones recomendadas para esos municipios son de **auditoría de reporte**, no
-de asignación de recursos.
+### Cobertura de los datos
 
-**Dice qué tan mala es la alerta.** De cada 100 municipios que el modelo marca en rojo, acierta
-unos 23. Esa cifra aparece junto a la predicción, no escondida en una nota al pie, porque
-presentar una precisión de 0,23 como "predicción" ante quien asigna presupuesto sería engañoso.
-La app la presenta como filtro de atención.
+Uno de los principales problemas encontrados durante el análisis fue la falta de información para varios municipios. De los 1.110 municipios analizados, 485 no presentan contratos registrados en SECOP dentro de los datos utilizados.
 
-**Bloquea la lectura causal.** El hallazgo más repetible del proyecto es que gasto y hurto
-correlacionan *positivamente*. Leído a la ligera diría "la vigilancia aumenta el hurto", lo cual es
-falso: refleja gasto reactivo. La sección de contexto lo advierte explícitamente.
+Además, aproximadamente el 93 % de los municipios que inicialmente aparecían como prioritarios correspondían en realidad a municipios sin información suficiente sobre inversión.
+
+Por esta razón, cuando no existe información de inversión, la aplicación muestra **“sin dato”** en lugar de asumir que la inversión fue de $0. Para estos casos se recomienda revisar primero la disponibilidad y calidad de la información antes de obtener conclusiones sobre la asignación de recursos.
+
+### Interpretación de las alertas
+
+El modelo no se plantea como una predicción definitiva del comportamiento del hurto. Entre los municipios identificados con una alerta alta, aproximadamente 23 de cada 100 corresponden efectivamente a casos positivos.
+
+Por esta razón, la predicción se presenta como una herramienta para identificar municipios que podrían requerir una revisión adicional y no como un criterio único para tomar decisiones presupuestales.
+
+### Relación entre inversión y hurto
+
+Durante el análisis se encontró una correlación positiva entre el gasto en seguridad y los niveles de hurto.
+
+Este resultado no implica que una mayor inversión produzca un aumento del hurto. Una posible explicación es que parte del gasto sea reactivo, es decir, que los municipios con mayores problemas de seguridad destinen más recursos para responder a estas situaciones.
+
+Por esta razón, la aplicación no presenta esta relación como causal y la utiliza únicamente como parte del contexto del análisis.
+
