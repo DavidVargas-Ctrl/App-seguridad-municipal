@@ -143,7 +143,11 @@ elif p["anios_con_secop"] < p["anios_totales"] / 2:
 
 # --------------------------------------------------------------------------- indicadores
 st.subheader("Situación del municipio")
-c1, c2, c3 = st.columns(3)
+
+# El cuarto indicador (desglose) solo aparece si el panel trae más de una categoría.
+CATS_DESGLOSE = [k for k in CATS if f"prom_{k}" in perfiles.columns]
+c1, c2, c3, *resto = st.columns(4 if len(CATS_DESGLOSE) > 1 else 3)
+c4 = resto[0] if resto else None
 
 c1.metric(etiqueta_cat, f"{p['cat_pc_prom']:.1f}",
           help="Casos por cada 10.000 habitantes al año, promedio 2016-2025.")
@@ -163,6 +167,17 @@ c3.metric("Tendencia", "En aumento" if tendencia > 0.1 else
           ("A la baja" if tendencia < -0.1 else "Estable"),
           delta=f"{tendencia:+.2f} por año", delta_color="inverse",
           help=f"Pendiente de la recta ajustada a {etiqueta_cat.lower()} per cápita, 2016-2025.")
+
+if c4 is not None:
+    ABREV = {"personas": "Pers.", "vehiculos": "Veh.", "residencias": "Res.",
+             "comercio": "Com.", "total": "Total"}
+    if "total" in CATS_DESGLOSE:
+        c4.metric("Hurto total", f"{p['prom_total']:.1f}",
+                  help="Compendio de las cuatro categorías, por 10.000 habitantes.")
+    else:
+        c4.metric("Desglose", "por categoría")
+    c4.caption(" · ".join(f"{ABREV[k]} {p[f'prom_{k}']:.1f}"
+                          for k in CATS_DESGLOSE if k != "total"))
 
 
 # --------------------------------------------------------------------------- gráfica
@@ -215,8 +230,12 @@ st.dataframe(
 st.subheader("Previsión para el próximo año")
 fila = ultimo[ultimo["divipola5"] == div]
 
-if fila.empty:
-    st.info("No hay datos suficientes para hacer una previsión de este municipio.")
+# Si al último año del municipio le falta alguna feature, el modelo aún devolvería una
+# predicción (los árboles de sklearn no fallan con NaN), pero sería basura presentada con
+# el mismo aspecto que una buena. Mejor decir que no se puede.
+if fila.empty or fila[FEATURES].isna().any(axis=1).iloc[0]:
+    st.info("No hay datos suficientes para hacer una previsión de este municipio en esta "
+            "categoría.")
 else:
     X = fila[FEATURES]
     prediccion = clf.predict(X)[0]

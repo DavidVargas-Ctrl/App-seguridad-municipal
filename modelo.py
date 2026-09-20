@@ -167,11 +167,16 @@ def construir_perfiles(dm, nombres, cat_key):
     """Un registro por municipio para LA categoria elegida: nivel, tendencia, cuadrante y cluster."""
     _, _, col_pc, _ = CATEGORIAS[cat_key]
 
+    # Promedio de TODAS las categorias disponibles, no solo la elegida: la app muestra un
+    # desglose de las cuatro para que el funcionario vea de un vistazo si el problema es
+    # general o de una sola categoria. No sale del cuaderno; es utilidad de interfaz.
+    cols_desglose = {k: v[2] for k, v in CATEGORIAS.items() if v[2] in dm.columns}
+
     filas = []
     for div, g in dm.groupby("divipola5"):
         g = g.sort_values("anio")
         a = g["anio"].values.astype(float)
-        filas.append({
+        fila = {
             "divipola5": div,
             "gasto_pc_prom": g["gasto_per_capita"].mean(),
             "gasto_pc_tend": _pendiente(a, g["gasto_per_capita"].values),
@@ -181,7 +186,10 @@ def construir_perfiles(dm, nombres, cat_key):
             "poblacion_prom": g["poblacion"].mean(),
             "anios_con_secop": int(g["tuvo_secop"].sum()),
             "anios_totales": len(g),
-        })
+        }
+        for k, c in cols_desglose.items():
+            fila[f"prom_{k}"] = g[c].mean()
+        filas.append(fila)
     p = pd.DataFrame(filas)
     p["tasa_competencia_prom"] = p["tasa_competencia_prom"].fillna(p["tasa_competencia_prom"].median())
     p = p.dropna(subset=["gasto_pc_prom", "cat_pc_prom", "poblacion_prom"]).reset_index(drop=True)
